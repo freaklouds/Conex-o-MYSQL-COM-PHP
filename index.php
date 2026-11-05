@@ -5,6 +5,6 @@
   <title>NO SQL INJECTION</title>
 </head>
 <body>
-    <?php echo "<h1>Olá, mundo!</h1>" ?>
+    <?php echo "<h1>Fé em Deus</h1>" ?>
 </body>
 </html>
