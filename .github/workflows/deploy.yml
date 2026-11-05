@@ -1,0 +1,80 @@
+# Este arquivo e um "roteiro" para o GitHub Actions.
+# Importante: os passos NAO rodam no seu computador.
+# O GitHub cria uma maquina virtual temporaria na nuvem para executar tudo.
+# Em `runs-on: ubuntu-latest`, estamos pedindo uma maquina Linux Ubuntu.
+# Quando o workflow (fluxo de tarefas a executar) termina, essa maquina e descartada e a proxima execucao comeca do zero.
+
+# Nome do workflow que aparece na aba "Actions" do GitHub
+name: Publicar site PHP no InfinityFree (FTP)
+
+# Define quando este workflow deve rodar
+on:
+  # Roda automaticamente quando houver push na branch main
+  push:
+    branches:
+      - main
+  # Permite rodar manualmente pela interface do GitHub (botao "Run workflow")
+  workflow_dispatch:
+
+# Forca actions JavaScript a rodarem em Node 24 desde ja
+# (ajuda a antecipar compatibilidade com a mudanca do GitHub)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Evita duas publicacoes ao mesmo tempo para o mesmo grupo
+concurrency:
+  # Nome do grupo de concorrencia (pode ser qualquer texto)
+  group: publicar-infinityfree-main
+  # Se iniciar uma nova execucao, cancela a execucao anterior em andamento
+  cancel-in-progress: true
+
+# Lista de tarefas (jobs) que o workflow vai executar
+jobs:
+  # Nome interno do job
+  publicar:
+    # Maquina virtual usada para executar os comandos
+    runs-on: ubuntu-latest
+
+    # Passos executados em ordem
+    steps:
+      # Baixa os arquivos do seu repositorio para dentro da maquina virtual
+      - name: Baixar codigo do repositorio
+        uses: actions/checkout@v5
+
+      # Instala e prepara o PHP para podermos validar os arquivos
+      - name: Configurar PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          # Versao do PHP usada no workflow (pode ajustar se precisar)
+          php-version: '8.2'
+
+      # Verifica se os arquivos .php tem erro de sintaxe antes de publicar
+      - name: Validar sintaxe dos arquivos PHP
+        run: |
+          # Procura todos os arquivos .php e roda "php -l" em cada um
+          find . -type f -name "*.php" -not -path "./.git/*" -print0 | while IFS= read -r -d '' file; do
+            php -l "$file"
+          done
+
+      # Envia os arquivos para sua hospedagem InfinityFree por FTP
+      - name: Publicar via FTP
+        # Action pronta que faz sincronizacao por FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          # Endereco do servidor FTP (vem de secret no GitHub)
+          server: ${{ secrets.FTP_SERVER }}
+          # Usuario FTP (secret)
+          username: ${{ secrets.FTP_USERNAME }}
+          # Senha FTP (secret)
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Pasta de destino no servidor (secret), ex.: /htdocs/
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # Lista de arquivos/pastas que NAO devem ser enviados
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/node_modules/**
+            **/.vscode/**
+            # Evita enviar o README para o servidor
+            README.md
